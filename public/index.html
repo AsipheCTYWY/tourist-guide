@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tourist Guide</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Tourist Guide</h1>
+    <p>Discover amazing places to visit</p>
+  </header>
+
+  <main>
+    <!-- Search and Filters should be inside main -->
+    <section class="search-section">
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search destinations by name..."
+      >
+    </section>
+
+    <section class="filters">
+      <button class="filter-btn active" data-category="all">All</button>
+      <button class="filter-btn" data-category="food">Food</button>
+      <button class="filter-btn" data-category="sightseeing">Sightseeing</button>
+      <button class="filter-btn" data-category="nightlife">Nightlife</button>
+    </section>
+
+    <section class="destinations" id="destinations">
+      <!-- Destinations will be rendered here -->
+    </section>
+
+    <section class="add-form">
+      <h2>Add a Destination</h2>
+      <form id="add-destination-form">
+        <input type="text" name="name" placeholder="Destination name" required>
+        <input type="text" name="location" placeholder="Location" required>
+        <select name="category" required>
+          <option value="">Select category</option>
+          <option value="food">Food</option>
+          <option value="sightseeing">Sightseeing</option>
+          <option value="nightlife">Nightlife</option>
+        </select>
+        <textarea name="description" placeholder="Description" required></textarea>
+        <input type="number" name="rating" min="1" max="5" placeholder="Rating (1-5)" required>
+        <button type="submit">Add Destination</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
