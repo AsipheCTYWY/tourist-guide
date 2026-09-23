@@ -21,7 +21,6 @@
           id="search-input"
           placeholder="Search destinations by name..."
         >
-        <button id="serpapi-import-btn" class="btn-import">🌍 Import from Web</button>
       </div>
     </section>
 
@@ -59,31 +58,6 @@
       </form>
     </section>
 
-    <!-- SERPAPI Import Modal -->
-    <div id="import-modal" class="modal" style="display:none;">
-      <div class="modal-content">
-        <span class="modal-close">&times;</span>
-        <h2>🌍 Import from Web</h2>
-        <p>Search for real places and import them as destinations</p>
-        
-        <div class="import-search">
-          <input type="text" id="import-search-input" placeholder="Search for places (e.g., Table Mountain, Cape Town)">
-          <button id="import-search-btn" class="btn-primary">Search</button>
-        </div>
-
-        <div class="import-categories">
-          <span class="import-label">Quick recommendations:</span>
-          <button class="rec-btn" data-category="sightseeing">🏛️ Sightseeing</button>
-          <button class="rec-btn" data-category="food">🍽️ Food</button>
-          <button class="rec-btn" data-category="nature">🌿 Nature</button>
-          <button class="rec-btn" data-category="adventure">🏔️ Adventure</button>
-          <button class="rec-btn" data-category="nightlife">🌙 Nightlife</button>
-        </div>
-
-        <div id="import-results" class="import-results"></div>
-        <div id="import-details" class="import-details"></div>
-      </div>
-    </div>
   </main>
 
   <script src="serpapi.js"></script>

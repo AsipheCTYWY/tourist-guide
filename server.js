@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const dotenv = require('dotenv');
@@ -18,7 +18,7 @@ const db = new sqlite3.Database('./tourist-guide.db', (err) => {
   }
 });
 
-// Create tables - SIMPLE VERSION without created_at
+// Create tables and migrate older databases to include optional destination fields.
 db.run(`
   CREATE TABLE IF NOT EXISTS destinations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,11 +33,42 @@ db.run(`
 `, (err) => {
   if (err) {
     console.error('Error creating table:', err.message);
-  } else {
-    console.log('✅ Table ready');
+    return;
   }
-});
 
+  db.all('PRAGMA table_info(destinations)', (schemaError, columns) => {
+    if (schemaError) {
+      console.error('Error checking destinations table:', schemaError.message);
+      return;
+    }
+
+    const existingColumns = new Set(columns.map((column) => column.name));
+    const missingColumns = [
+      ['image_url', 'TEXT'],
+      ['meta', 'TEXT']
+    ].filter(([name]) => !existingColumns.has(name));
+
+    function addMissingColumn(index) {
+      if (index >= missingColumns.length) {
+        console.log('Destinations table ready.');
+        startServer();
+        return;
+      }
+
+      const [name, type] = missingColumns[index];
+      db.run(`ALTER TABLE destinations ADD COLUMN ${name} ${type}`, (migrationError) => {
+        if (migrationError) {
+          console.error(`Error adding ${name} column:`, migrationError.message);
+          return;
+        }
+        console.log(`Added ${name} column to destinations.`);
+        addMissingColumn(index + 1);
+      });
+    }
+
+    addMissingColumn(0);
+  });
+});
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -126,14 +157,16 @@ app.delete('/api/destinations/:id', (req, res) => {
 try {
   const serpapiRoutes = require('./routes/serpapi');
   app.use('/api/serpapi', serpapiRoutes);
-  console.log('✅ SERPAPI routes loaded');
+  console.log('âœ… SERPAPI routes loaded');
 } catch (err) {
-  console.error('❌ Error loading SERPAPI routes:', err.message);
+  console.error('âŒ Error loading SERPAPI routes:', err.message);
 }
 
 // ==================== START SERVER ====================
 
-app.listen(PORT, () => {
-  console.log(`🚀 Tourist Guide server running at http://localhost:${PORT}`);
-  console.log(`🔑 SERPAPI: ${process.env.SERPAPI_KEY ? '✓ Configured' : '✗ Not configured'}`);
-});
+function startServer() {
+  app.listen(PORT, () => {
+    console.log(`Tourist Guide server running at http://localhost:${PORT}`);
+    console.log(`SERPAPI: ${process.env.SERPAPI_KEY ? 'Configured' : 'Not configured'}`);
+  });
+}

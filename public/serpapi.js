@@ -77,6 +77,9 @@ const SerpAPI = {
         image_url: imageUrl,
         meta: JSON.stringify({
           place_id: place.place_id,
+          reviews: place.reviews,
+          type: place.type,
+          price_level: place.price_level,
           address: place.address,
           phone: place.phone,
           website: place.website,

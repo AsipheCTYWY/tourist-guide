@@ -1,8 +1,90 @@
 let currentCategory = 'all';
 let currentSearch = '';
+const destinationImageCache = new Map();
+
+async function loadMissingDestinationImages() {
+  const placeholders = [...document.querySelectorAll('.destination-image-placeholder[data-image-query]')];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < placeholders.length) {
+      const placeholder = placeholders[nextIndex++];
+      const query = placeholder.dataset.imageQuery;
+      if (!placeholder.isConnected) continue;
+      const image = document.createElement('img');
+      image.dataset.imageQuery = query;
+      image.dataset.candidateIndex = '-1';
+      image.alt = placeholder.dataset.imageName || '';
+      image.loading = 'lazy';
+      image.referrerPolicy = 'no-referrer';
+      image.addEventListener('error', () => tryNextDestinationImage(image));
+      placeholder.replaceWith(image);
+      tryNextDestinationImage(image);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(3, placeholders.length) }, worker));
+}
+
+async function tryNextDestinationImage(image) {
+  if (!image.isConnected) return;
+  const query = image.dataset.imageQuery;
+  const key = query.toLowerCase();
+  if (!destinationImageCache.has(key)) {
+    destinationImageCache.set(key, SerpAPI.searchImages(query, 3).then(images => {
+      const urls = images.flatMap(result => [result.thumbnail, result.original]).filter(Boolean);
+      return [...new Set(urls)];
+    }));
+  }
+
+  const candidates = await destinationImageCache.get(key);
+  if (!image.isConnected) return;
+  const nextIndex = Number(image.dataset.candidateIndex || -1) + 1;
+  if (nextIndex >= candidates.length) {
+    image.remove();
+    return;
+  }
+
+  image.dataset.candidateIndex = String(nextIndex);
+  image.src = candidates[nextIndex];
+}
 
 // Fetch destinations from the server
 async function fetchDestinations(category, search) {
+  const container = document.getElementById('destinations');
+  if (category === 'food') {
+    container.innerHTML = '<p class="empty-state">Finding restaurants...</p>';
+    try {
+      const query = search ? `restaurants ${search}` : 'restaurants';
+      const [savedResponse, places] = await Promise.all([
+        fetch('/api/destinations?category=food' + (search ? '&search=' + encodeURIComponent(search) : '')),
+        SerpAPI.searchPlaces(query, 'South Africa')
+      ]);
+      if (!savedResponse.ok) throw new Error(`HTTP error! status: ${savedResponse.status}`);
+      const saved = await savedResponse.json();
+      const recommended = places.map(place => ({
+        name: place.title,
+        description: place.description || `${place.title} in ${place.address || 'South Africa'}`,
+        category: 'food',
+        location: place.address || 'South Africa',
+        rating: place.rating ? Math.round(place.rating) : 0,
+        image_url: place.thumbnail,
+        meta: JSON.stringify({ place_id: place.place_id, reviews: place.reviews, type: place.type, tags: [place.type || 'Restaurant'] })
+      }));
+      const seen = new Set();
+      renderDestinations([...recommended, ...saved].filter(place => {
+        const key = place.name.trim().toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }));
+    } catch (error) {
+      console.error('Error loading restaurant recommendations:', error);
+      container.innerHTML = '<p class="empty-state">Could not load restaurant recommendations. Please try again.</p>';
+    }
+    return;
+  }
+
   try {
     let url = '/api/destinations';
     const params = [];
@@ -34,46 +116,56 @@ async function fetchDestinations(category, search) {
   }
 }
 
-// Render destination cards
+// Render destination cards in the photo-led explore layout.
 function renderDestinations(destinations) {
   const container = document.getElementById('destinations');
 
   if (!destinations || destinations.length === 0) {
-    container.innerHTML =
-      '<p>No destinations found. Try a different search or filter.</p>';
+    container.innerHTML = '<p class="empty-state">No destinations found. Try a different search or filter.</p>';
     return;
   }
 
   container.innerHTML = destinations.map(function(dest) {
-    const stars = '★'.repeat(dest.rating) + '☆'.repeat(5 - dest.rating);
-    
-    // Parse meta if it exists
-    let metaBadge = '';
-    if (dest.meta) {
-      try {
-        const meta = JSON.parse(dest.meta);
-        if (meta.place_id) {
-          metaBadge = '<span class="meta-badge">🌍 Imported</span>';
-        }
-      } catch (e) {}
-    }
+    let meta = {};
+    try { meta = dest.meta ? JSON.parse(dest.meta) : {}; } catch (e) {}
+
+    const category = (dest.category || 'Things to Do').replace(/[-_]/g, ' ');
+    const score = Math.max(0, Math.min(5, Number(dest.rating) || 0));
+    const reviews = Number(meta.reviews) || 0;
+    const tags = Array.isArray(meta.tags) && meta.tags.length
+      ? meta.tags.slice(0, 3)
+      : [category, meta.price_level, meta.type].filter(Boolean).slice(0, 3);
+    const ratingDots = Array.from({ length: 5 }, (_, index) =>
+      `<span class="rating-dot${index < Math.round(score) ? ' is-filled' : ''}"></span>`
+    ).join('');
+    const image = dest.image_url
+      ? `<img src="${escapeHtml(dest.image_url)}" data-image-query="${escapeHtml(`${dest.name} ${dest.location}`)}" data-candidate-index="-1" alt="${escapeHtml(dest.name)}" loading="lazy" referrerpolicy="no-referrer">`
+      : `<div class="destination-image-placeholder" data-image-query="${escapeHtml(`${dest.name} ${dest.location}`)}" data-image-name="${escapeHtml(dest.name)}" aria-hidden="true"></div>`;
 
     return `
-      <div class="destination-card">
-        ${dest.image_url ? `<img src="${escapeHtml(dest.image_url)}" alt="${escapeHtml(dest.name)}" loading="lazy">` : ''}
+      <article class="destination-card">
+        <div class="destination-card-media">
+          ${image}
+          <span class="category-pill">${escapeHtml(category)}</span>
+        </div>
         <div class="destination-card-content">
           <h3>${escapeHtml(dest.name)}</h3>
-          <span class="category">${escapeHtml(dest.category)}</span>
-          ${metaBadge}
-          <p class="location">📍 ${escapeHtml(dest.location)}</p>
+          <div class="destination-rating" aria-label="Rated ${score} out of 5">
+            <span class="rating-dots">${ratingDots}</span>
+            <span class="review-count">${reviews ? `${reviews.toLocaleString()} reviews` : `${score}/5 rating`}</span>
+          </div>
+          <p class="location"><span aria-hidden="true">?</span> ${escapeHtml(dest.location)}</p>
+          ${tags.length ? `<div class="destination-tags">${tags.map(tag => `<span>${escapeHtml(String(tag))}</span>`).join('')}</div>` : ''}
           <p class="description">${escapeHtml(dest.description)}</p>
-          <p class="rating">${stars}</p>
         </div>
-      </div>
+      </article>
     `;
   }).join('');
+  container.querySelectorAll('.destination-card-media img[data-image-query]').forEach(image => {
+    image.addEventListener('error', () => tryNextDestinationImage(image));
+  });
+  loadMissingDestinationImages();
 }
-
 // Simple HTML escaping
 function escapeHtml(text) {
   if (!text) return '';
@@ -141,188 +233,6 @@ document.getElementById('add-destination-form')
       alert('Failed to add destination: ' + error.message);
     }
   });
-
-// ==================== SERPAPI IMPORT ====================
-
-// DOM Elements
-const importBtn = document.getElementById('serpapi-import-btn');
-const importModal = document.getElementById('import-modal');
-const modalClose = document.querySelector('.modal-close');
-const importSearchInput = document.getElementById('import-search-input');
-const importSearchBtn = document.getElementById('import-search-btn');
-const importResults = document.getElementById('import-results');
-const importDetails = document.getElementById('import-details');
-
-// Open modal
-importBtn.addEventListener('click', function() {
-  importModal.style.display = 'flex';
-  importResults.innerHTML = '';
-  importDetails.innerHTML = '';
-  importSearchInput.value = '';
-  importSearchInput.focus();
-});
-
-// Close modal
-modalClose.addEventListener('click', function() {
-  importModal.style.display = 'none';
-});
-
-// Close modal when clicking outside
-importModal.addEventListener('click', function(e) {
-  if (e.target === importModal) {
-    importModal.style.display = 'none';
-  }
-});
-
-// Search places
-async function searchPlaces(query) {
-  importResults.innerHTML = '<div class="loading">Searching...</div>';
-  
-  try {
-    const results = await SerpAPI.searchPlaces(query);
-    
-    if (results.length === 0) {
-      importResults.innerHTML = '<p>No places found. Try a different search.</p>';
-      return;
-    }
-
-    importResults.innerHTML = results.map(place => `
-      <div class="import-result-item" data-place-id="${place.place_id}">
-        ${place.thumbnail ? `<img src="${place.thumbnail}" alt="${place.title}" loading="lazy">` : ''}
-        <div>
-          <h4>${escapeHtml(place.title)}</h4>
-          ${place.rating ? `<div class="rating">⭐ ${place.rating} (${place.reviews || 0} reviews)</div>` : ''}
-          ${place.address ? `<p class="address">📍 ${escapeHtml(place.address)}</p>` : ''}
-          ${place.type ? `<span style="font-size:0.8rem;color:#666;">${escapeHtml(place.type)}</span>` : ''}
-        </div>
-      </div>
-    `).join('');
-
-    // Add click handlers to results
-    document.querySelectorAll('.import-result-item').forEach(item => {
-      item.addEventListener('click', function() {
-        const placeId = this.dataset.placeId;
-        showPlaceDetails(placeId);
-      });
-    });
-
-  } catch (error) {
-    importResults.innerHTML = '<p style="color:red;">Error searching places. Please try again.</p>';
-    console.error(error);
-  }
-}
-
-// Show place details
-async function showPlaceDetails(placeId) {
-  importDetails.innerHTML = '<div class="loading">Loading details...</div>';
-  
-  try {
-    const place = await SerpAPI.getPlaceDetails(placeId);
-    
-    if (!place) {
-      importDetails.innerHTML = '<p>Failed to load place details.</p>';
-      return;
-    }
-
-    // Get images
-    const images = await SerpAPI.searchImages(place.title, 5);
-
-    importDetails.innerHTML = `
-      <h3>${escapeHtml(place.title)}</h3>
-      ${place.thumbnail ? `<img src="${place.thumbnail}" alt="${place.title}">` : ''}
-      
-      <div class="import-details-grid">
-        <div>
-          <label>Category</label>
-          <select id="import-category">
-            <option value="sightseeing">Sightseeing</option>
-            <option value="food">Food</option>
-            <option value="nightlife">Nightlife</option>
-            <option value="adventure">Adventure</option>
-            <option value="nature">Nature</option>
-          </select>
-        </div>
-        <div>
-          <label>Location</label>
-          <input type="text" id="import-location" value="${escapeHtml(place.address || 'South Africa')}">
-        </div>
-      </div>
-      
-      ${place.rating ? `<p>⭐ ${place.rating} (${place.reviews || 0} reviews)</p>` : ''}
-      ${place.address ? `<p>📍 ${escapeHtml(place.address)}</p>` : ''}
-      ${place.phone ? `<p>📞 ${escapeHtml(place.phone)}</p>` : ''}
-      ${place.website ? `<p>🌐 <a href="${place.website}" target="_blank">${place.website}</a></p>` : ''}
-      ${place.description ? `<p>${escapeHtml(place.description)}</p>` : ''}
-      
-      ${images.length > 0 ? `
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:0.5rem;margin:1rem 0;">
-          ${images.slice(0, 4).map(img => `
-            <img src="${img.thumbnail}" alt="${place.title}" style="width:100%;height:100px;object-fit:cover;border-radius:4px;">
-          `).join('')}
-        </div>
-      ` : ''}
-      
-      <div class="import-actions">
-        <button id="import-confirm-btn" class="btn-primary">✅ Import Destination</button>
-        <button id="import-cancel-btn" class="btn-secondary">Cancel</button>
-      </div>
-    `;
-
-    // Confirm import button
-    document.getElementById('import-confirm-btn').addEventListener('click', async function() {
-      const category = document.getElementById('import-category').value;
-      const location = document.getElementById('import-location').value;
-      
-      this.disabled = true;
-      this.textContent = 'Importing...';
-      
-      try {
-        await SerpAPI.importPlace(placeId, category, location);
-        alert('✅ Destination imported successfully!');
-        importModal.style.display = 'none';
-        await fetchDestinations(currentCategory, currentSearch);
-      } catch (error) {
-        alert('❌ Failed to import: ' + error.message);
-      } finally {
-        this.disabled = false;
-        this.textContent = '✅ Import Destination';
-      }
-    });
-
-    // Cancel button
-    document.getElementById('import-cancel-btn').addEventListener('click', function() {
-      importDetails.innerHTML = '';
-    });
-
-  } catch (error) {
-    importDetails.innerHTML = '<p style="color:red;">Error loading place details.</p>';
-    console.error(error);
-  }
-}
-
-// Search button handler
-importSearchBtn.addEventListener('click', function() {
-  const query = importSearchInput.value.trim();
-  if (query) {
-    searchPlaces(query);
-  }
-});
-
-// Enter key for search
-importSearchInput.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    importSearchBtn.click();
-  }
-});
-
-// Quick recommendation buttons
-document.querySelectorAll('.rec-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    const category = this.dataset.category;
-    importSearchInput.value = `${category} in South Africa`;
-    searchPlaces(`${category} in South Africa`);
-  });
-});
 
 // Initial load
 fetchDestinations('all', '');
