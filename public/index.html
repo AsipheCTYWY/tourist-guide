@@ -13,26 +13,32 @@
   </header>
 
   <main>
-    <!-- Search and Filters should be inside main -->
+    <!-- Search and Filters -->
     <section class="search-section">
-      <input
-        type="text"
-        id="search-input"
-        placeholder="Search destinations by name..."
-      >
+      <div class="search-container">
+        <input
+          type="text"
+          id="search-input"
+          placeholder="Search destinations by name..."
+        >
+        <button id="serpapi-import-btn" class="btn-import">🌍 Import from Web</button>
+      </div>
     </section>
 
     <section class="filters">
       <button class="filter-btn active" data-category="all">All</button>
-      <button class="filter-btn" data-category="food">Food</button>
-      <button class="filter-btn" data-category="sightseeing">Sightseeing</button>
-      <button class="filter-btn" data-category="nightlife">Nightlife</button>
+      <button class="filter-btn" data-category="food">🍽️ Food</button>
+      <button class="filter-btn" data-category="sightseeing">🏛️ Sightseeing</button>
+      <button class="filter-btn" data-category="nightlife">🌙 Nightlife</button>
+      <button class="filter-btn" data-category="adventure">🏔️ Adventure</button>
+      <button class="filter-btn" data-category="nature">🌿 Nature</button>
     </section>
 
     <section class="destinations" id="destinations">
       <!-- Destinations will be rendered here -->
     </section>
 
+    <!-- Add Destination Form -->
     <section class="add-form">
       <h2>Add a Destination</h2>
       <form id="add-destination-form">
@@ -43,14 +49,44 @@
           <option value="food">Food</option>
           <option value="sightseeing">Sightseeing</option>
           <option value="nightlife">Nightlife</option>
+          <option value="adventure">Adventure</option>
+          <option value="nature">Nature</option>
         </select>
         <textarea name="description" placeholder="Description" required></textarea>
         <input type="number" name="rating" min="1" max="5" placeholder="Rating (1-5)" required>
+        <input type="text" name="image_url" placeholder="Image URL (optional)">
         <button type="submit">Add Destination</button>
       </form>
     </section>
+
+    <!-- SERPAPI Import Modal -->
+    <div id="import-modal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <h2>🌍 Import from Web</h2>
+        <p>Search for real places and import them as destinations</p>
+        
+        <div class="import-search">
+          <input type="text" id="import-search-input" placeholder="Search for places (e.g., Table Mountain, Cape Town)">
+          <button id="import-search-btn" class="btn-primary">Search</button>
+        </div>
+
+        <div class="import-categories">
+          <span class="import-label">Quick recommendations:</span>
+          <button class="rec-btn" data-category="sightseeing">🏛️ Sightseeing</button>
+          <button class="rec-btn" data-category="food">🍽️ Food</button>
+          <button class="rec-btn" data-category="nature">🌿 Nature</button>
+          <button class="rec-btn" data-category="adventure">🏔️ Adventure</button>
+          <button class="rec-btn" data-category="nightlife">🌙 Nightlife</button>
+        </div>
+
+        <div id="import-results" class="import-results"></div>
+        <div id="import-details" class="import-details"></div>
+      </div>
+    </div>
   </main>
 
+  <script src="serpapi.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

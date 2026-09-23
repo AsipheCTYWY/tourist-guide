@@ -1,164 +1,309 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* Add these styles to your existing CSS */
 
-body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background-color: #f5f5f5;
-  color: #333;
-  line-height: 1.6;
-}
-
-header {
-  background-color: #2c3e50;
-  color: white;
-  text-align: center;
-  padding: 2rem;
-}
-
-header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-}
-
-main {
-  max-width: 1000px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-}
-.destinations {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 3rem;
-}
-
-.destination-card {
-  background: white;
-  border-radius: 10px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s;
-}
-
-.destination-card:hover {
-  transform: translateY(-3px);
-}
-.destination-card h3 {
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-}
-
-.destination-card .category {
-  display: inline-block;
-  padding: 0.2rem 0.8rem;
-  background-color: #ecf0f1;
-  border-radius: 15px;
-  font-size: 0.8rem;
-  color: #7f8c8d;
-  margin-bottom: 0.5rem;
-}
-
-.destination-card .location {
-  color: #7f8c8d;
-  font-size: 0.9rem;
-  margin-bottom: 0.5rem;
-}
-
-.destination-card .description {
-  font-size: 0.9rem;
-  color: #555;
-}
-
-.destination-card .rating {
-  margin-top: 0.5rem;
-  color: #f39c12;
-}
-
-.add-form {
-  background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.add-form h2 {
-  margin-bottom: 1rem;
-  color: #2c3e50;
-}
-
-#add-destination-form {
+/* Import Button */
+.search-container {
   display: flex;
-  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+#serpapi-import-btn {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
+  white-space: nowrap;
+}
+
+#serpapi-import-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 100%;
+  position: relative;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-close {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #999;
+  transition: color 0.3s;
+}
+
+.modal-close:hover {
+  color: #333;
+}
+
+.import-search {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.import-search input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.import-search input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.import-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 1rem 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+
+.import-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.rec-btn {
+  padding: 0.3rem 1rem;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.9rem;
+}
+
+.rec-btn:hover {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+/* Import Results */
+.import-results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.import-result-item {
+  padding: 1rem;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.import-result-item:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.import-result-item img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.import-result-item h4 {
+  margin: 0 0 0.3rem 0;
+}
+
+.import-result-item .rating {
+  color: #f39c12;
+  font-size: 0.9rem;
+}
+
+.import-result-item .address {
+  font-size: 0.8rem;
+  color: #666;
+  margin: 0.3rem 0 0 0;
+}
+
+/* Import Details */
+.import-details {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.import-details img {
+  max-width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.import-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 1rem;
 }
 
-#add-destination-form input,
-#add-destination-form select,
-#add-destination-form textarea {
-  padding: 0.75rem;
+.import-details label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.import-details input,
+.import-details select {
+  width: 100%;
+  padding: 0.5rem;
   border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
+  border-radius: 4px;
 }
 
-#add-destination-form textarea {
-  min-height: 100px;
-  resize: vertical;
+.import-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
-#add-destination-form button {
-  padding: 0.75rem;
-  background-color: #27ae60;
+.btn-primary {
+  padding: 0.75rem 2rem;
+  background: #667eea;
   color: white;
   border: none;
-  border-radius: 5px;
-  font-size: 1rem;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  font-weight: 600;
+  transition: background 0.3s;
 }
 
-#add-destination-form button:hover {
-  background-color: #219a52;
+.btn-primary:hover {
+  background: #5a67d8;
 }
 
-.filters {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
+.btn-secondary {
+  padding: 0.75rem 2rem;
+  background: #e2e8f0;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s;
 }
 
-.filter-btn {
-  padding: 0.5rem 1.5rem;
-  border: 2px solid #2c3e50;
+.btn-secondary:hover {
+  background: #cbd5e0;
+}
+
+/* Destination Card with Images */
+.destination-card {
   background: white;
-  color: #2c3e50;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 0.9rem;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
 }
 
-.filter-btn.active,
-.filter-btn:hover {
-  background-color: #2c3e50;
-  color: white;
+.destination-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
-.search-section {
-  margin-bottom: 1rem;
-}
-
-#search-input {
+.destination-card img {
   width: 100%;
-  padding: 0.75rem 1rem;
-  border: 2px solid #ddd;
-  border-radius: 25px;
-  font-size: 1rem;
+  height: 200px;
+  object-fit: cover;
 }
 
-#search-input:focus {
-  border-color: #2c3e50;
+.destination-card-content {
+  padding: 1.5rem;
+}
+
+.destination-card .meta-badge {
+  display: inline-block;
+  padding: 0.2rem 0.8rem;
+  background: #ecf0f1;
+  border-radius: 15px;
+  font-size: 0.7rem;
+  color: #7f8c8d;
+  margin-bottom: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .search-container {
+    flex-direction: column;
+  }
+  
+  #serpapi-import-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .import-results {
+    grid-template-columns: 1fr;
+  }
+  
+  .import-details-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .import-search {
+    flex-direction: column;
+  }
 }
