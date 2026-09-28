@@ -52,67 +52,53 @@ async function tryNextDestinationImage(image) {
 // Fetch destinations from the server
 async function fetchDestinations(category, search) {
   const container = document.getElementById('destinations');
-  if (category === 'food') {
-    container.innerHTML = '<p class="empty-state">Finding restaurants...</p>';
-    try {
-      const query = search ? `restaurants ${search}` : 'restaurants';
-      const [savedResponse, places] = await Promise.all([
-        fetch('/api/destinations?category=food' + (search ? '&search=' + encodeURIComponent(search) : '')),
-        SerpAPI.searchPlaces(query, 'South Africa')
-      ]);
-      if (!savedResponse.ok) throw new Error(`HTTP error! status: ${savedResponse.status}`);
-      const saved = await savedResponse.json();
-      const recommended = places.map(place => ({
-        name: place.title,
-        description: place.description || `${place.title} in ${place.address || 'South Africa'}`,
-        category: 'food',
-        location: place.address || 'South Africa',
-        rating: place.rating ? Math.round(place.rating) : 0,
-        image_url: place.thumbnail,
-        meta: JSON.stringify({ place_id: place.place_id, reviews: place.reviews, type: place.type, tags: [place.type || 'Restaurant'] })
-      }));
-      const seen = new Set();
-      renderDestinations([...recommended, ...saved].filter(place => {
-        const key = place.name.trim().toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      }));
-    } catch (error) {
-      console.error('Error loading restaurant recommendations:', error);
-      container.innerHTML = '<p class="empty-state">Could not load restaurant recommendations. Please try again.</p>';
-    }
-    return;
-  }
-
+  const queries = {
+    sightseeing: 'top tourist attractions',
+    food: 'restaurants',
+    nightlife: 'nightlife',
+    adventure: 'adventure activities',
+    nature: 'nature attractions'
+  };
+  const categories = category === 'all' ? Object.keys(queries) : [category];
+  const usesSerpApi = categories.every(key => queries[key]);
+  container.innerHTML = `<p class="empty-state">${usesSerpApi ? 'Finding places...' : 'Loading destinations...'}</p>`;
   try {
-    let url = '/api/destinations';
-    const params = [];
+    const params = new URLSearchParams();
+    if (category !== 'all') params.set('category', category);
+    if (search) params.set('search', search);
+    const queryString = params.toString();
+    const savedUrl = '/api/destinations' + (queryString ? `?${queryString}` : '');
+    const [savedResponse, ...categoryResults] = await Promise.all([
+      fetch(savedUrl),
+      ...categories.map(async key => {
+        if (!queries[key]) return [];
+        const query = `${queries[key]}${search ? ` ${search}` : ''}`;
+        const places = await SerpAPI.searchPlaces(query, 'South Africa');
+        return places.slice(0, category === 'all' ? 6 : 20).map(place => ({
+          name: place.title,
+          description: place.description || `${place.title} in ${place.address || 'South Africa'}`,
+          category: key,
+          location: place.address || 'South Africa',
+          rating: place.rating ? Math.round(place.rating) : 0,
+          image_url: place.thumbnail,
+          meta: JSON.stringify({ place_id: place.place_id, reviews: place.reviews, type: place.type, tags: [place.type || key] })
+        }));
+      })
+    ]);
 
-    if (category && category !== 'all') {
-      params.push('category=' + encodeURIComponent(category));
-    }
-
-    if (search) {
-      params.push('search=' + encodeURIComponent(search));
-    }
-
-    if (params.length > 0) {
-      url += '?' + params.join('&');
-    }
-
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const destinations = await response.json();
-    renderDestinations(destinations);
+    if (!savedResponse.ok) throw new Error(`HTTP error! status: ${savedResponse.status}`);
+    const saved = await savedResponse.json();
+    const seen = new Set();
+    const combined = [...categoryResults.flat(), ...saved].filter(place => {
+      const key = place.name.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    renderDestinations(combined);
   } catch (error) {
-    console.error('Error fetching destinations:', error);
-    const container = document.getElementById('destinations');
-    container.innerHTML = '<p>Error loading destinations. Please try again.</p>';
+    console.error('Error fetching destination results:', error);
+    container.innerHTML = '<p class="empty-state">Could not load destinations. Please try again.</p>';
   }
 }
 
@@ -154,7 +140,7 @@ function renderDestinations(destinations) {
             <span class="rating-dots">${ratingDots}</span>
             <span class="review-count">${reviews ? `${reviews.toLocaleString()} reviews` : `${score}/5 rating`}</span>
           </div>
-          <p class="location"><span aria-hidden="true">?</span> ${escapeHtml(dest.location)}</p>
+          <p class="location">${escapeHtml(dest.location)}</p>
           ${tags.length ? `<div class="destination-tags">${tags.map(tag => `<span>${escapeHtml(String(tag))}</span>`).join('')}</div>` : ''}
           <p class="description">${escapeHtml(dest.description)}</p>
         </div>
