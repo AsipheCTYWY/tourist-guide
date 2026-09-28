@@ -342,5 +342,97 @@ document.getElementById('add-destination-form')
     }
   });
 
+// Account sign in and sign up
+const authModal = document.getElementById('auth-modal');
+const authFeedback = document.getElementById('auth-feedback');
+const signInView = document.getElementById('auth-signin-view');
+const signUpView = document.getElementById('auth-signup-view');
+let signedInUser = null;
+
+function updateAccountHeader(user) {
+  signedInUser = user;
+  const name = document.getElementById('signed-in-name');
+  name.textContent = user ? `${user.name} ${user.surname}` : '';
+  name.hidden = !user;
+  document.getElementById('auth-open-btn').hidden = Boolean(user);
+  document.getElementById('auth-signout-btn').hidden = !user;
+}
+
+function setAuthView(view) {
+  const isSignUp = view === 'signup';
+  signInView.hidden = isSignUp;
+  signUpView.hidden = !isSignUp;
+  document.querySelector('.auth-card').setAttribute('aria-labelledby', isSignUp ? 'auth-signup-title' : 'auth-title');
+  authFeedback.textContent = '';
+}
+
+function closeAuthModal() {
+  authModal.hidden = true;
+  document.body.classList.remove('modal-open');
+  authFeedback.textContent = '';
+}
+
+async function submitAuthForm(event, endpoint) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submit = form.querySelector('[type="submit"]');
+  submit.disabled = true;
+  authFeedback.textContent = 'Please wait...';
+
+  try {
+    const response = await fetch(`/api/auth/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.fromEntries(new FormData(form)))
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not sign in.');
+    updateAccountHeader(result.user);
+    form.reset();
+    closeAuthModal();
+  } catch (error) {
+    authFeedback.textContent = error.message;
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+document.getElementById('auth-open-btn').addEventListener('click', () => {
+  setAuthView('signin');
+  authModal.hidden = false;
+  document.body.classList.add('modal-open');
+  authModal.querySelector('#auth-signin-form input').focus();
+});
+document.getElementById('auth-close-btn').addEventListener('click', closeAuthModal);
+document.getElementById('show-signup-btn').addEventListener('click', () => {
+  setAuthView('signup');
+  authModal.querySelector('#auth-signup-form input').focus();
+});
+document.getElementById('show-signin-btn').addEventListener('click', () => {
+  setAuthView('signin');
+  authModal.querySelector('#auth-signin-form input').focus();
+});
+authModal.addEventListener('click', event => {
+  if (event.target === authModal) closeAuthModal();
+});
+document.getElementById('auth-signin-form').addEventListener('submit', event => submitAuthForm(event, 'signin'));
+document.getElementById('auth-signup-form').addEventListener('submit', event => submitAuthForm(event, 'signup'));
+document.getElementById('auth-signout-btn').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/auth/signout', { method: 'POST' });
+    if (!response.ok) throw new Error('Sign out failed.');
+    updateAccountHeader(null);
+  } catch (error) {
+    console.error(error);
+  }
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !authModal.hidden) closeAuthModal();
+});
+fetch('/api/auth/me')
+  .then(response => response.ok ? response.json() : null)
+  .then(result => { if (result?.user) updateAccountHeader(result.user); })
+  .catch(error => console.error('Could not restore sign in:', error));
+
 // Initial load
 fetchDestinations('all', '');
