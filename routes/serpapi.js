@@ -80,9 +80,21 @@ router.get('/details/:placeId', async (req, res) => {
         address: result.address || null,
         phone: result.phone || null,
         website: result.website || null,
+        booking_link: result.booking_link || null,
         description: result.description || null,
+        price: result.price || result.price_level || null,
+        open_state: result.open_state || null,
+        hours: result.hours || null,
+        extensions: result.extensions || [],
+        amenities: result.amenities || null,
+        services: result.services || null,
+        events: result.events || [],
         thumbnail: result.thumbnail || null,
-        images: result.images?.map(img => img.original) || [],
+        images: result.images?.map(img => ({
+          title: img.title || null,
+          thumbnail: img.thumbnail || null,
+          original: img.original || null
+        })) || [],
         latitude: result.gps_coordinates?.latitude || null,
         longitude: result.gps_coordinates?.longitude || null,
         price_level: result.price_level || null

@@ -147,11 +147,133 @@ function renderDestinations(destinations) {
       </article>
     `;
   }).join('');
+  container.querySelectorAll('.destination-card').forEach((card, index) => {
+    card.destination = destinations[index];
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `View details for ${destinations[index].name}`);
+    card.addEventListener('click', () => openDestinationDetails(card.destination));
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openDestinationDetails(card.destination);
+      }
+    });
+  });
   container.querySelectorAll('.destination-card-media img[data-image-query]').forEach(image => {
     image.addEventListener('error', () => tryNextDestinationImage(image));
   });
   loadMissingDestinationImages();
 }
+
+let activeDestinationRequest = 0;
+
+function formatPlaceInfo(value, depth = 0) {
+  if (value === null || value === undefined || value === '') return '';
+  if (Array.isArray(value)) {
+    return value.map(item => formatPlaceInfo(item, depth + 1)).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    if (depth > 2) return '';
+    return Object.entries(value)
+      .map(([key, item]) => {
+        const formatted = formatPlaceInfo(item, depth + 1);
+        return formatted ? `${key.replace(/[_-]/g, ' ')}: ${formatted}` : '';
+      })
+      .filter(Boolean)
+      .join(' · ');
+  }
+  return String(value);
+}
+
+function renderDestinationDetails(destination, place = {}) {
+  let meta = {};
+  try { meta = destination.meta ? JSON.parse(destination.meta) : {}; } catch (e) {}
+
+  const title = place.title || destination.name;
+  const category = (destination.category || 'Destination').replace(/[-_]/g, ' ');
+  const rating = Number(place.rating || destination.rating) || 0;
+  const reviews = Number(place.reviews || meta.reviews) || 0;
+  const location = place.address || meta.address || destination.location;
+  const description = place.description || destination.description;
+  const firstPlaceImage = place.images?.[0];
+  const imageUrl = destination.image_url || place.thumbnail || firstPlaceImage?.original || firstPlaceImage?.thumbnail || firstPlaceImage || meta.images?.[0];
+  const type = place.type || meta.type;
+  const phone = place.phone || meta.phone;
+  const website = place.website || meta.website;
+  const safeWebsite = website && /^https?:\/\//i.test(website) ? website : null;
+  const bookingLink = place.booking_link;
+  const safeBookingLink = bookingLink && /^https?:\/\//i.test(bookingLink) ? bookingLink : null;
+  const price = formatPlaceInfo(place.price);
+  const openState = formatPlaceInfo(place.open_state);
+  const hours = formatPlaceInfo(place.hours);
+  const offerings = [formatPlaceInfo(place.extensions), formatPlaceInfo(place.amenities), formatPlaceInfo(place.services)].filter(Boolean).join('; ');
+  const events = formatPlaceInfo(place.events);
+  const extraDetails = [
+    type && `<div><dt>Type</dt><dd>${escapeHtml(type)}</dd></div>`,
+    price && `<div><dt>Price</dt><dd>${escapeHtml(price)}</dd></div>`,
+    phone && `<div><dt>Phone</dt><dd><a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></dd></div>`,
+    openState && `<div><dt>Current hours</dt><dd>${escapeHtml(openState)}</dd></div>`
+  ].filter(Boolean).join('');
+  const websiteLinks = [
+    safeWebsite && `<a class="destination-website-link" href="${escapeHtml(safeWebsite)}" target="_blank" rel="noopener noreferrer">Visit website</a>`,
+    safeBookingLink && `<a class="destination-website-link destination-booking-link" href="${escapeHtml(safeBookingLink)}" target="_blank" rel="noopener noreferrer">Booking information</a>`
+  ].filter(Boolean).join('');
+
+  document.getElementById('destination-modal-content').innerHTML = `
+    ${imageUrl ? `<img class="destination-detail-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}" referrerpolicy="no-referrer">` : ''}
+    <div class="destination-detail-body">
+      <span class="category-pill destination-detail-category">${escapeHtml(category)}</span>
+      <h2 id="destination-modal-title">${escapeHtml(title)}</h2>
+      <p class="destination-detail-rating">${rating ? `${rating.toFixed(1)} / 5` : 'Rating unavailable'}${reviews ? ` · ${reviews.toLocaleString()} reviews` : ''}</p>
+      <p class="destination-detail-location">${escapeHtml(location || 'Location unavailable')}</p>
+      <p class="destination-detail-description">${escapeHtml(description || 'No description available.')}</p>
+      ${websiteLinks ? `<div class="destination-detail-links">${websiteLinks}</div>` : ''}
+      ${extraDetails ? `<dl class="destination-detail-facts">${extraDetails}</dl>` : ''}
+      ${hours ? `<section class="destination-detail-section"><h3>Hours</h3><p>${escapeHtml(hours)}</p></section>` : ''}
+      ${offerings ? `<section class="destination-detail-section"><h3>What this place offers</h3><p>${escapeHtml(offerings)}</p></section>` : ''}
+      ${events ? `<section class="destination-detail-section"><h3>Events</h3><p>${escapeHtml(events)}</p></section>` : ''}
+    </div>
+  `;
+}
+
+async function openDestinationDetails(destination) {
+  const requestId = ++activeDestinationRequest;
+  const modal = document.getElementById('destination-modal');
+  const content = document.getElementById('destination-modal-content');
+  let meta = {};
+  try { meta = destination.meta ? JSON.parse(destination.meta) : {}; } catch (e) {}
+
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+  renderDestinationDetails(destination);
+  if (meta.place_id) {
+    const loading = document.createElement('p');
+    loading.className = 'destination-detail-loading';
+    loading.textContent = 'Loading more place details...';
+    content.querySelector('.destination-detail-body').append(loading);
+    const place = await SerpAPI.getPlaceDetails(meta.place_id);
+    if (requestId !== activeDestinationRequest) return;
+    loading.remove();
+    if (place) renderDestinationDetails(destination, place);
+  }
+  modal.querySelector('.destination-modal-close').focus();
+}
+
+function closeDestinationDetails() {
+  activeDestinationRequest += 1;
+  document.getElementById('destination-modal').hidden = true;
+  document.body.classList.remove('modal-open');
+}
+
+document.querySelector('.destination-modal-close').addEventListener('click', closeDestinationDetails);
+document.getElementById('destination-modal').addEventListener('click', event => {
+  if (event.target.id === 'destination-modal') closeDestinationDetails();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !document.getElementById('destination-modal').hidden) closeDestinationDetails();
+});
+
 // Simple HTML escaping
 function escapeHtml(text) {
   if (!text) return '';
